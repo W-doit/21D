@@ -20,9 +20,20 @@ Open the printed local URL on your phone (same Wi‑Fi), or use Chrome DevTools 
 Project: `https://zozjvsirafcdpzdffibk.supabase.co`
 
 1. Copy the **anon public** key into `.env` as `VITE_SUPABASE_ANON_KEY`.
-2. In the Supabase SQL editor, run [`supabase/migrations/001_init.sql`](supabase/migrations/001_init.sql).
+2. In the Supabase SQL editor, run [`supabase/migrations/001_init.sql`](supabase/migrations/001_init.sql) (already applied if you used MCP).
 3. Enable Email auth in Authentication → Providers.
-4. Confirm the `progress-photos` storage bucket exists (created by the migration when permitted).
+4. Confirm the `progress-photos` storage bucket exists.
+
+### Google / social login
+
+Use Supabase’s built-in Auth UI (already on `/auth`). Enable providers in the dashboard — no custom Google button needed:
+
+1. [Authentication → Providers → Google](https://supabase.com/dashboard/project/zozjvsirafcdpzdffibk/auth/providers) → enable and paste Google Cloud Client ID + Secret  
+   (see [docs](https://supabase.com/docs/guides/auth/social-login/auth-google))
+2. Google redirect URI: `https://zozjvsirafcdpzdffibk.supabase.co/auth/v1/callback`
+3. Supabase redirect allowlist: `http://localhost:5173/auth` (and production `/auth`)
+
+To show more providers (Apple, GitHub, …), enable them in the dashboard and add them to the `providers` array in `src/pages/Auth.tsx`.
 
 ## Phone install (PWA)
 

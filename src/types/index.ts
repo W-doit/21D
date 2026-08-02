@@ -16,6 +16,8 @@ export interface RemedySuggestion {
   expectedDaysToResult: number
   mediaPlatform: MediaPlatform
   mediaUrl: string
+  /** Optional static guide image (e.g. /acupressure/li4.svg). */
+  imageUrl?: string
   steps: string[]
 }
 
@@ -28,6 +30,7 @@ export interface UserRoutine {
   expectedDaysToResult: number
   mediaPlatform: MediaPlatform
   mediaUrl: string
+  imageUrl?: string
   steps: string[]
   schedule: RoutineSchedule
   startDate: string

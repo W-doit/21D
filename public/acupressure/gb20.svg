@@ -1,0 +1,12 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 320 360" role="img" aria-label="GB20 Fengchi at base of skull">
+  <rect width="320" height="360" fill="#f6f4ef"/>
+  <text x="160" y="36" text-anchor="middle" font-family="Georgia, serif" font-size="18" fill="#1a2e1f">GB20 · Fengchi</text>
+  <text x="160" y="58" text-anchor="middle" font-family="system-ui,sans-serif" font-size="11" fill="#3d5244">Base of skull · hollows either side</text>
+  <ellipse cx="160" cy="140" rx="55" ry="65" fill="#ebe6db" stroke="#1a2e1f" stroke-width="2"/>
+  <path d="M130 200 C140 230 180 230 190 200" fill="none" stroke="#1a2e1f" stroke-width="2"/>
+  <circle cx="140" cy="195" r="9" fill="#c45c4a"/>
+  <circle cx="180" cy="195" r="9" fill="#c45c4a"/>
+  <circle cx="140" cy="195" r="14" fill="none" stroke="#c45c4a" stroke-width="2"/>
+  <circle cx="180" cy="195" r="14" fill="none" stroke="#c45c4a" stroke-width="2"/>
+  <text x="160" y="345" text-anchor="middle" font-family="system-ui,sans-serif" font-size="12" fill="#3d5244">Press up &amp; in 12 min · both sides</text>
+</svg>

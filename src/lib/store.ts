@@ -33,8 +33,23 @@ export function loadStore(): AppStore {
   }
 }
 
+const STORE_CHANGED = '21d-store-changed'
+
+export function notifyStoreChanged() {
+  if (typeof window !== 'undefined') {
+    window.dispatchEvent(new Event(STORE_CHANGED))
+  }
+}
+
 export function saveStore(store: AppStore) {
   localStorage.setItem(STORE_KEY, JSON.stringify(store))
+  notifyStoreChanged()
+}
+
+/** Re-render when local store is written (e.g. after cloud sync). */
+export function subscribeStore(onChange: () => void) {
+  window.addEventListener(STORE_CHANGED, onChange)
+  return () => window.removeEventListener(STORE_CHANGED, onChange)
 }
 
 export function uid(prefix = 'id') {

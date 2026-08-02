@@ -1,19 +1,24 @@
+import { useState } from 'react'
 import { VideoEmbed } from './VideoEmbed'
 import { useI18n } from '../i18n/I18nProvider'
-import type { RemedySuggestion } from '../types'
+import type { RemedySuggestion, RoutineSchedule } from '../types'
 
 export function SuggestionDetail({
   item,
   isAdded,
   onClose,
   onAdd,
+  defaultTime = '09:00',
 }: {
   item: RemedySuggestion
   isAdded: boolean
   onClose: () => void
-  onAdd: () => void
+  onAdd: (schedule: RoutineSchedule) => void
+  defaultTime?: string
 }) {
   const { t } = useI18n()
+  const [time, setTime] = useState(defaultTime)
+  const [notify, setNotify] = useState(true)
 
   return (
     <div
@@ -54,6 +59,16 @@ export function SuggestionDetail({
             {item.description}
           </p>
 
+          {item.imageUrl && (
+            <div className="mt-5 overflow-hidden rounded-2xl ring-1 ring-ink/8">
+              <img
+                src={item.imageUrl}
+                alt={t('pointLocationGuide')}
+                className="w-full bg-mist-deep"
+              />
+            </div>
+          )}
+
           {(item.mediaPlatform !== 'none' || item.mediaUrl) && (
             <div className="mt-5">
               <p className="mb-2 text-sm font-medium text-ink-soft">
@@ -84,11 +99,40 @@ export function SuggestionDetail({
             </section>
           )}
 
+          <section className="surface mt-6 !p-4">
+            <p className="text-sm font-medium text-ink">{t('alarm')}</p>
+            <p className="mt-1 text-xs text-ink/45">{t('alarmOnAddHint')}</p>
+            <div className="mt-3 flex items-center gap-3">
+              <input
+                type="time"
+                className="field !w-auto"
+                value={time}
+                onChange={(e) => setTime(e.target.value)}
+                aria-label={t('alarm')}
+              />
+              <label className="flex items-center gap-2 text-sm text-ink-soft">
+                <input
+                  type="checkbox"
+                  checked={notify}
+                  onChange={(e) => setNotify(e.target.checked)}
+                  className="size-4 accent-sage"
+                />
+                {t('notifyMe')}
+              </label>
+            </div>
+          </section>
+
           <button
             type="button"
             disabled={isAdded}
             className={`mt-6 w-full ${isAdded ? 'btn-secondary' : 'btn-primary'}`}
-            onClick={onAdd}
+            onClick={() =>
+              onAdd({
+                time: time || '09:00',
+                days: [0, 1, 2, 3, 4, 5, 6],
+                notify,
+              })
+            }
           >
             {isAdded ? t('addedToPlan') : t('addToPlan')}
           </button>

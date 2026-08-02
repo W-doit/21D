@@ -1,6 +1,7 @@
-import { useMemo, useState, type FormEvent } from 'react'
+import { useEffect, useMemo, useState, type FormEvent } from 'react'
 import { Link, useParams } from 'react-router-dom'
 import { PhotoCapture } from '../components/PhotoCapture'
+import { RoutineEditForm } from '../components/RoutineEditForm'
 import { StarRating } from '../components/StarRating'
 import { VideoEmbed } from '../components/VideoEmbed'
 import { useI18n } from '../i18n/I18nProvider'
@@ -9,26 +10,32 @@ import {
   requestNotificationPermission,
   sendDemoNotification,
 } from '../lib/notifications'
+import { updateRoutineCloud } from '../lib/routinesApi'
 import {
   addPhoto,
   addRating,
   dayIndexSince,
   getRoutine,
   loadStore,
+  subscribeStore,
   uid,
   upsertRoutine,
 } from '../lib/store'
+import type { UserRoutine } from '../types'
 
 export function RoutineDetailPage() {
   const { t } = useI18n()
   const { id = '' } = useParams()
   const [version, setVersion] = useState(0)
   const refresh = () => setVersion((n) => n + 1)
+  const [editing, setEditing] = useState(false)
+
+  useEffect(() => subscribeStore(refresh), [])
 
   const routine = useMemo(() => getRoutine(id), [id, version])
   const store = useMemo(() => loadStore(), [version])
 
-  const [time, setTime] = useState(routine?.schedule.time ?? '21:00')
+  const [time, setTime] = useState(routine?.schedule.time ?? '09:00')
   const [notify, setNotify] = useState(routine?.schedule.notify ?? true)
   const [caption, setCaption] = useState('')
   const [stars, setStars] = useState(
@@ -38,6 +45,12 @@ export function RoutineDetailPage() {
     store.ratings.find((r) => r.routineId === id)?.comment ?? '',
   )
   const [permMsg, setPermMsg] = useState<string | null>(null)
+
+  useEffect(() => {
+    if (!routine) return
+    setTime(routine.schedule.time)
+    setNotify(routine.schedule.notify)
+  }, [routine?.id, routine?.schedule.time, routine?.schedule.notify])
 
   if (!routine) {
     return (
@@ -55,6 +68,8 @@ export function RoutineDetailPage() {
   const needsBaseline = !photos.some((p) => p.dayIndex === 0)
   const resultDay = routine.expectedDaysToResult
   const readyToRate = day + 1 >= Math.min(resultDay, routine.targetDays)
+  const hasVideo =
+    routine.mediaPlatform !== 'none' && Boolean(routine.mediaUrl?.trim())
 
   const saveSchedule = async () => {
     let nextNotify = notify
@@ -73,10 +88,19 @@ export function RoutineDetailPage() {
         setPermMsg(t('status', { perm: getNotificationPermission() }))
       }
     }
-    upsertRoutine({
+    await updateRoutineCloud({
       ...routine,
       schedule: { ...routine.schedule, time, notify: nextNotify },
     })
+    refresh()
+  }
+
+  const saveEdits = async (next: UserRoutine) => {
+    if (next.schedule.notify) {
+      await requestNotificationPermission()
+    }
+    await updateRoutineCloud(next)
+    setEditing(false)
     refresh()
   }
 
@@ -109,14 +133,40 @@ export function RoutineDetailPage() {
     refresh()
   }
 
+  if (editing) {
+    return (
+      <div className="page">
+        <Link to="/today" className="text-sm text-ink-soft">
+          {t('backToday')}
+        </Link>
+        <h1 className="mt-4 text-2xl font-medium text-ink">{routine.title}</h1>
+        <RoutineEditForm
+          routine={routine}
+          onCancel={() => setEditing(false)}
+          onSave={saveEdits}
+        />
+      </div>
+    )
+  }
+
   return (
     <div className="page">
-      <Link to="/today" className="text-sm text-ink-soft">
-        {t('backToday')}
-      </Link>
+      <div className="flex items-center justify-between gap-3">
+        <Link to="/today" className="text-sm text-ink-soft">
+          {t('backToday')}
+        </Link>
+        <button
+          type="button"
+          className="text-sm font-medium text-sage-deep"
+          onClick={() => setEditing(true)}
+        >
+          {t('editRoutine')}
+        </button>
+      </div>
 
       <p className="mt-4 text-[11px] uppercase tracking-wider text-ink/40">
-        {routine.category} · {t('dayOf', {
+        {routine.category} ·{' '}
+        {t('dayOf', {
           day: Math.min(day + 1, routine.targetDays),
           total: routine.targetDays,
         })}
@@ -129,18 +179,41 @@ export function RoutineDetailPage() {
       </p>
 
       <div className="mt-6">
-        <VideoEmbed
-          platform={routine.mediaPlatform}
-          url={routine.mediaUrl}
-          fallbackTitle={routine.title}
-        />
+        {routine.imageUrl && (
+          <div className="mb-4 overflow-hidden rounded-2xl ring-1 ring-ink/8">
+            <img
+              src={routine.imageUrl}
+              alt={t('pointLocationGuide')}
+              className="w-full bg-mist-deep"
+            />
+          </div>
+        )}
+        {hasVideo ? (
+          <VideoEmbed
+            platform={routine.mediaPlatform}
+            url={routine.mediaUrl}
+            fallbackTitle={routine.title}
+          />
+        ) : (
+          <button
+            type="button"
+            className="surface w-full text-left !py-4"
+            onClick={() => setEditing(true)}
+          >
+            <p className="font-medium text-ink">{t('addVideoLink')}</p>
+            <p className="mt-1 text-xs text-ink/45">{t('addVideoLinkHint')}</p>
+          </button>
+        )}
       </div>
 
       <section className="mt-8">
         <h2 className="text-sm font-medium text-ink-soft">{t('steps')}</h2>
         <ol className="mt-3 space-y-2">
           {routine.steps.map((step, i) => (
-            <li key={step} className="surface flex gap-3 !py-3 text-sm text-ink">
+            <li
+              key={`${routine.id}-step-${i}`}
+              className="surface flex gap-3 !py-3 text-sm text-ink"
+            >
               <span className="text-ink/30">{i + 1}</span>
               {step}
             </li>
@@ -168,7 +241,11 @@ export function RoutineDetailPage() {
             {t('notifyMe')}
           </label>
         </div>
-        <button type="button" className="btn-secondary mt-4 w-full" onClick={saveSchedule}>
+        <button
+          type="button"
+          className="btn-secondary mt-4 w-full"
+          onClick={saveSchedule}
+        >
           {t('saveSchedule')}
         </button>
         {permMsg && <p className="mt-2 text-xs text-ink/50">{permMsg}</p>}
@@ -197,7 +274,9 @@ export function RoutineDetailPage() {
 
         {readyToRate && (
           <div className="surface mt-3">
-            <p className="font-medium text-ink">{t('checkinPhoto', { n: resultDay })}</p>
+            <p className="font-medium text-ink">
+              {t('checkinPhoto', { n: resultDay })}
+            </p>
             <p className="mt-1 text-xs text-ink/45">{t('checkinHint')}</p>
             <div className="mt-3">
               <PhotoCapture
@@ -211,7 +290,10 @@ export function RoutineDetailPage() {
         {photos.length > 0 && (
           <div className="mt-4 grid grid-cols-2 gap-3">
             {photos.map((p) => (
-              <figure key={p.id} className="overflow-hidden rounded-2xl ring-1 ring-ink/8">
+              <figure
+                key={p.id}
+                className="overflow-hidden rounded-2xl ring-1 ring-ink/8"
+              >
                 <img
                   src={p.dataUrl}
                   alt={p.caption || t('dayLabel', { n: p.dayIndex })}

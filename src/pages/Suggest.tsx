@@ -1,10 +1,15 @@
 import { useEffect, useState } from 'react'
 import { Link, useLocation, useNavigate } from 'react-router-dom'
+import { CustomRemedyForm } from '../components/CustomRemedyForm'
 import { SuggestionDetail } from '../components/SuggestionDetail'
 import { suggestRoutines } from '../lib/ai/suggest'
 import { useI18n } from '../i18n/I18nProvider'
-import { loadStore, uid, upsertRoutine } from '../lib/store'
-import type { RemedySuggestion, UserRoutine } from '../types'
+import {
+  requestNotificationPermission,
+  sendDemoNotification,
+} from '../lib/notifications'
+import { createRoutineForUser } from '../lib/routinesApi'
+import type { RemedySuggestion, RoutineSchedule } from '../types'
 
 export function SuggestPage() {
   const { t, locale } = useI18n()
@@ -12,62 +17,80 @@ export function SuggestPage() {
   const location = useLocation()
   const goal =
     (location.state as { goal?: string } | null)?.goal ||
-    loadStore().profile.goal ||
     ''
 
   const [items, setItems] = useState<RemedySuggestion[]>([])
   const [source, setSource] = useState<'gemini' | 'mock' | null>(null)
+  const [failReason, setFailReason] = useState<
+    'rate_limit' | 'invalid_key' | 'missing_key' | 'unavailable' | null
+  >(null)
   const [loading, setLoading] = useState(true)
   const [added, setAdded] = useState<Set<string>>(new Set())
   const [selected, setSelected] = useState<RemedySuggestion | null>(null)
+  const [showCustom, setShowCustom] = useState(false)
+  const [saving, setSaving] = useState(false)
 
   useEffect(() => {
     let alive = true
     setLoading(true)
     setSource(null)
-    suggestRoutines(goal || 'bienestar general', locale).then((result) => {
-      if (!alive) return
-      setItems(result.suggestions)
-      setSource(result.source)
-      setLoading(false)
-    })
+    setFailReason(null)
+    const storedGoal =
+      (location.state as { goal?: string } | null)?.goal ||
+      JSON.parse(localStorage.getItem('21d-store-v1') || '{}')?.profile?.goal ||
+      ''
+    suggestRoutines(goal || storedGoal || 'bienestar general', locale).then(
+      (result) => {
+        if (!alive) return
+        setItems(result.suggestions)
+        setSource(result.source)
+        setFailReason(result.reason)
+        setLoading(false)
+      },
+    )
     return () => {
       alive = false
     }
-  }, [goal, locale])
+  }, [goal, locale, location.state])
 
   useEffect(() => {
-    if (!selected) return
+    if (!selected && !showCustom) return
     const onKey = (e: KeyboardEvent) => {
-      if (e.key === 'Escape') setSelected(null)
+      if (e.key === 'Escape') {
+        setSelected(null)
+        setShowCustom(false)
+      }
     }
     window.addEventListener('keydown', onKey)
     return () => window.removeEventListener('keydown', onKey)
-  }, [selected])
+  }, [selected, showCustom])
 
-  const addItem = (item: RemedySuggestion) => {
-    const routine: UserRoutine = {
-      id: uid('routine'),
-      remedyId: item.id,
-      title: item.title,
-      description: item.description,
-      category: item.category,
-      expectedDaysToResult: item.expectedDaysToResult,
-      mediaPlatform: item.mediaPlatform,
-      mediaUrl: item.mediaUrl,
-      steps: item.steps,
-      schedule: {
-        time: '21:00',
-        days: [0, 1, 2, 3, 4, 5, 6],
-        notify: true,
-      },
-      startDate: new Date().toISOString().slice(0, 10),
-      targetDays: 21,
-      status: 'active',
-      createdAt: new Date().toISOString(),
+  const addItem = async (item: RemedySuggestion, schedule: RoutineSchedule) => {
+    setSaving(true)
+    try {
+      if (schedule.notify) {
+        const perm = await requestNotificationPermission()
+        if (perm === 'granted') {
+          sendDemoNotification(
+            item.title,
+            t('alarmSetFor', { time: schedule.time }),
+          )
+        }
+      }
+      await createRoutineForUser(item, schedule)
+      setAdded((prev) => new Set(prev).add(item.id))
+    } finally {
+      setSaving(false)
     }
-    upsertRoutine(routine)
-    setAdded((prev) => new Set(prev).add(item.id))
+  }
+
+  const saveCustom = async (
+    item: RemedySuggestion,
+    schedule: RoutineSchedule,
+  ) => {
+    await addItem(item, schedule)
+    setItems((prev) => [item, ...prev])
+    setShowCustom(false)
   }
 
   return (
@@ -95,9 +118,23 @@ export function SuggestPage() {
       )}
       {!loading && source === 'mock' && (
         <p className="mt-3 rounded-2xl bg-sand/40 px-4 py-3 text-xs leading-relaxed text-ink-soft">
-          {t('usingFallback')}
+          {failReason === 'rate_limit'
+            ? t('usingFallbackRateLimit')
+            : failReason === 'missing_key'
+              ? t('usingFallbackMissingKey')
+              : failReason === 'invalid_key'
+                ? t('usingFallbackInvalidKey')
+                : t('usingFallback')}
         </p>
       )}
+
+      <button
+        type="button"
+        className="btn-secondary mt-5 w-full"
+        onClick={() => setShowCustom(true)}
+      >
+        + {t('addCustomRemedy')}
+      </button>
 
       <div className="mt-6 space-y-3">
         {loading && (
@@ -131,9 +168,15 @@ export function SuggestPage() {
                 </button>
                 <button
                   type="button"
-                  disabled={isAdded}
+                  disabled={isAdded || saving}
                   className={`mt-4 w-full ${isAdded ? 'btn-secondary' : 'btn-primary'}`}
-                  onClick={() => addItem(item)}
+                  onClick={() =>
+                    addItem(item, {
+                      time: '09:00',
+                      days: [0, 1, 2, 3, 4, 5, 6],
+                      notify: true,
+                    })
+                  }
                 >
                   {isAdded ? t('addedToPlan') : t('addToPlan')}
                 </button>
@@ -157,9 +200,16 @@ export function SuggestPage() {
           item={selected}
           isAdded={added.has(selected.id)}
           onClose={() => setSelected(null)}
-          onAdd={() => {
-            addItem(selected)
+          onAdd={async (schedule) => {
+            await addItem(selected, schedule)
           }}
+        />
+      )}
+
+      {showCustom && (
+        <CustomRemedyForm
+          onClose={() => setShowCustom(false)}
+          onSave={saveCustom}
         />
       )}
     </div>

@@ -1,23 +1,20 @@
-import { useMemo, useState } from 'react'
 import { Link } from 'react-router-dom'
 import { AstroNudge } from '../components/AstroNudge'
 import { RoutineCard } from '../components/RoutineCard'
+import { useActiveRoutines } from '../hooks/useRoutines'
 import { useI18n } from '../i18n/I18nProvider'
 import {
   addCheckin,
   dayIndexSince,
-  loadStore,
   removeCheckin,
   uid,
 } from '../lib/store'
 
 export function TodayPage() {
   const { t } = useI18n()
-  const [version, setVersion] = useState(0)
-  const refresh = () => setVersion((n) => n + 1)
-
-  const store = useMemo(() => loadStore(), [version])
-  const active = store.routines.filter((r) => r.status === 'active')
+  const { active, store, syncing, isGuest, refresh } = useActiveRoutines({
+    forDate: new Date(),
+  })
   const name = store.profile.displayName || t('there')
 
   const isDone = (routineId: string, dayIndex: number) =>
@@ -59,7 +56,21 @@ export function TodayPage() {
           </Link>
         </div>
 
-        {active.length === 0 ? (
+        {syncing && active.length === 0 && (
+          <p className="mb-3 text-sm text-ink/40">{t('syncingRoutines')}</p>
+        )}
+
+        {isGuest && active.length === 0 && (
+          <div className="surface mb-3 text-center">
+            <p className="text-ink">{t('signInToSeeRoutines')}</p>
+            <p className="mt-1 text-sm text-ink-soft">{t('signInToSeeRoutinesHint')}</p>
+            <Link to="/auth" className="btn-primary mt-5 inline-flex">
+              {t('signIn')}
+            </Link>
+          </div>
+        )}
+
+        {!isGuest && active.length === 0 && !syncing ? (
           <div className="surface text-center">
             <p className="text-ink">{t('noRoutines')}</p>
             <p className="mt-1 text-sm text-ink-soft">{t('noRoutinesHint')}</p>
@@ -67,7 +78,9 @@ export function TodayPage() {
               {t('start21')}
             </Link>
           </div>
-        ) : (
+        ) : null}
+
+        {active.length > 0 && (
           <div className="space-y-3">
             {active.map((routine) => {
               const day = dayIndexSince(routine.startDate)

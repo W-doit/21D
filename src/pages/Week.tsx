@@ -1,15 +1,19 @@
 import { useMemo, useState } from 'react'
 import { Link } from 'react-router-dom'
 import { AstroNudge } from '../components/AstroNudge'
+import {
+  focusForDate,
+  isScheduledOn,
+  useActiveRoutines,
+} from '../hooks/useRoutines'
 import { useI18n } from '../i18n/I18nProvider'
-import { dayIndexSince, loadStore } from '../lib/store'
+import { dayIndexSince } from '../lib/store'
 import type { TransitPrompt } from '../types'
 
 export function WeekPage() {
   const { t } = useI18n()
-  const store = useMemo(() => loadStore(), [])
-  const active = store.routines.filter((r) => r.status === 'active')
-  const [selected, setSelected] = useState(0)
+  const { store } = useActiveRoutines()
+  const [selected, setSelected] = useState(() => new Date().getDay())
 
   const weekly: TransitPrompt = {
     id: 'weekly',
@@ -32,6 +36,15 @@ export function WeekPage() {
     d.setDate(d.getDate() - d.getDay() + i)
     return d
   })
+
+  const selectedDate = days[selected] ?? new Date()
+  const active = useMemo(() => {
+    return store.routines
+      .filter((r) => r.status === 'active')
+      .filter((r) => isScheduledOn(r, selectedDate))
+      .slice()
+      .sort((a, b) => a.schedule.time.localeCompare(b.schedule.time))
+  }, [store, selectedDate])
 
   return (
     <div className="page">
@@ -76,6 +89,7 @@ export function WeekPage() {
           )}
           {active.map((r) => {
             const day = Math.min(dayIndexSince(r.startDate) + 1, r.targetDays)
+            const focus = focusForDate(r, selectedDate)
             return (
               <Link
                 key={r.id}
@@ -86,6 +100,7 @@ export function WeekPage() {
                   <p className="font-medium text-ink">{r.title}</p>
                   <p className="text-xs text-ink/45">
                     {t('dayOf', { day, total: r.targetDays })} · {r.schedule.time}
+                    {focus ? ` · ${focus}` : ''}
                   </p>
                 </div>
                 <span className="text-ink/30">→</span>

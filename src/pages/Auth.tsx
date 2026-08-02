@@ -1,44 +1,37 @@
-import { useState, type FormEvent } from 'react'
+import { useEffect } from 'react'
 import { Link, useNavigate } from 'react-router-dom'
+import { Auth } from '@supabase/auth-ui-react'
+import { ThemeSupa } from '@supabase/auth-ui-shared'
 import { useAuth } from '../app/auth-context'
 import { useI18n } from '../i18n/I18nProvider'
+import { supabase } from '../lib/supabase'
 import { loadStore } from '../lib/store'
 
 export function AuthPage() {
-  const { signIn, signUp, continueAsGuest, configured } = useAuth()
+  const { continueAsGuest, configured, user, loading } = useAuth()
   const { t } = useI18n()
   const navigate = useNavigate()
-  const [mode, setMode] = useState<'in' | 'up'>('up')
-  const [email, setEmail] = useState('')
-  const [password, setPassword] = useState('')
-  const [name, setName] = useState('')
-  const [error, setError] = useState<string | null>(null)
-  const [busy, setBusy] = useState(false)
 
   const goNext = () => {
     const onboarded = loadStore().profile.onboardingDone
-    navigate(onboarded ? '/today' : '/onboarding')
+    navigate(onboarded ? '/today' : '/onboarding', { replace: true })
   }
 
-  const onSubmit = async (e: FormEvent) => {
-    e.preventDefault()
-    setBusy(true)
-    setError(null)
-    const result =
-      mode === 'in'
-        ? await signIn(email, password)
-        : await signUp(email, password, name)
-    setBusy(false)
-    if (result.error) {
-      setError(result.error)
-      return
-    }
-    goNext()
-  }
+  useEffect(() => {
+    if (!loading && user) goNext()
+  }, [loading, user])
 
   const onGuest = () => {
     continueAsGuest()
     goNext()
+  }
+
+  if (loading) {
+    return (
+      <div className="page-wide">
+        <p className="text-sm text-ink-soft">{t('oneMoment')}</p>
+      </div>
+    )
   }
 
   return (
@@ -46,79 +39,79 @@ export function AuthPage() {
       <Link to="/" className="display text-3xl text-ink">
         21D
       </Link>
-      <h1 className="mt-8 text-2xl font-medium text-ink">
-        {mode === 'in' ? t('welcomeBack') : t('createSpace')}
-      </h1>
+      <h1 className="mt-8 text-2xl font-medium text-ink">{t('createSpace')}</h1>
       <p className="mt-2 text-sm text-ink-soft">
         {configured ? t('authCloud') : t('authDemo')}
       </p>
 
-      <form onSubmit={onSubmit} className="mt-8 space-y-4">
-        {mode === 'up' && (
-          <div>
-            <label className="label" htmlFor="name">
-              {t('name')}
-            </label>
-            <input
-              id="name"
-              className="field"
-              value={name}
-              onChange={(e) => setName(e.target.value)}
-              placeholder={t('namePlaceholder')}
-              autoComplete="name"
-            />
-          </div>
-        )}
-        <div>
-          <label className="label" htmlFor="email">
-            {t('email')}
-          </label>
-          <input
-            id="email"
-            type="email"
-            required={configured}
-            className="field"
-            value={email}
-            onChange={(e) => setEmail(e.target.value)}
-            placeholder="you@email.com"
-            autoComplete="email"
+      {configured && supabase ? (
+        <div className="auth-ui mt-8">
+          <Auth
+            supabaseClient={supabase}
+            view="sign_in"
+            providers={[]}
+            redirectTo={`${window.location.origin}/auth`}
+            localization={{
+              variables: {
+                sign_in: {
+                  email_label: t('email'),
+                  password_label: t('password'),
+                  button_label: t('signIn'),
+                  link_text: t('haveAccount'),
+                },
+                sign_up: {
+                  email_label: t('email'),
+                  password_label: t('password'),
+                  button_label: t('continue'),
+                  link_text: t('needAccount'),
+                },
+              },
+            }}
+            appearance={{
+              theme: ThemeSupa,
+              variables: {
+                default: {
+                  colors: {
+                    brand: '#1a2e1f',
+                    brandAccent: '#4a6b50',
+                    brandButtonText: '#f6f4ef',
+                    defaultButtonBackground: '#ffffff',
+                    defaultButtonBackgroundHover: '#ebe6db',
+                    defaultButtonBorder: 'rgba(26, 46, 31, 0.12)',
+                    defaultButtonText: '#1a2e1f',
+                    inputBackground: 'rgba(255,255,255,0.8)',
+                    inputBorder: 'rgba(26, 46, 31, 0.08)',
+                    inputBorderHover: 'rgba(107, 143, 113, 0.4)',
+                    inputBorderFocus: 'rgba(107, 143, 113, 0.5)',
+                    inputText: '#1a2e1f',
+                    inputLabelText: '#3d5244',
+                    inputPlaceholder: 'rgba(26, 46, 31, 0.35)',
+                  },
+                  fonts: {
+                    bodyFontFamily: 'Outfit, ui-sans-serif, system-ui, sans-serif',
+                    buttonFontFamily: 'Outfit, ui-sans-serif, system-ui, sans-serif',
+                    inputFontFamily: 'Outfit, ui-sans-serif, system-ui, sans-serif',
+                    labelFontFamily: 'Outfit, ui-sans-serif, system-ui, sans-serif',
+                  },
+                  radii: {
+                    borderRadiusButton: '16px',
+                    buttonBorderRadius: '16px',
+                    inputBorderRadius: '16px',
+                  },
+                },
+              },
+            }}
+            theme="default"
+            onlyThirdPartyProviders={false}
+            magicLink={false}
+            showLinks
           />
         </div>
-        <div>
-          <label className="label" htmlFor="password">
-            {t('password')}
-          </label>
-          <input
-            id="password"
-            type="password"
-            required={configured}
-            minLength={6}
-            className="field"
-            value={password}
-            onChange={(e) => setPassword(e.target.value)}
-            placeholder="••••••••"
-            autoComplete={mode === 'in' ? 'current-password' : 'new-password'}
-          />
-        </div>
-
-        {error && (
-          <p className="rounded-2xl bg-coral/10 px-4 py-3 text-sm text-coral">
-            {error}
-          </p>
-        )}
-
-        <button type="submit" className="btn-primary w-full" disabled={busy}>
-          {busy ? t('oneMoment') : mode === 'in' ? t('signIn') : t('continue')}
-        </button>
-      </form>
-
-      <button
-        type="button"
-        className="btn-ghost mt-3 w-full"
-        onClick={() => setMode(mode === 'in' ? 'up' : 'in')}
-      >
-        {mode === 'in' ? t('needAccount') : t('haveAccount')}
-      </button>
+      ) : (
+        <p className="mt-8 rounded-2xl bg-sand/40 px-4 py-3 text-sm text-ink-soft">
+          {t('authDemo')}
+        </p>
+      )}
 
       <button type="button" className="btn-secondary mt-6 w-full" onClick={onGuest}>
         {t('continueGuest')}

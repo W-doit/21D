@@ -1,5 +1,6 @@
 import { Link } from 'react-router-dom'
 import type { UserRoutine } from '../types'
+import { focusForDate } from '../hooks/useRoutines'
 import { dayIndexSince } from '../lib/store'
 import { useI18n } from '../i18n/I18nProvider'
 
@@ -14,6 +15,7 @@ export function RoutineCard({
 }) {
   const { t } = useI18n()
   const day = Math.min(dayIndexSince(routine.startDate) + 1, routine.targetDays)
+  const focus = focusForDate(routine)
 
   return (
     <div className="surface flex gap-4 !p-4">
@@ -48,7 +50,8 @@ export function RoutineCard({
           </span>
         </div>
         <p className="mt-1 text-sm text-ink-soft line-clamp-2">
-          {routine.schedule.time} · {routine.category}
+          {routine.schedule.time}
+          {focus ? ` · ${focus}` : ` · ${routine.category}`}
         </p>
         <div className="mt-3 h-1 overflow-hidden rounded-full bg-mist-deep">
           <div

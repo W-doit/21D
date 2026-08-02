@@ -80,13 +80,25 @@ function normalize(raw: unknown): Suggestion[] {
       const title = String(o.title ?? "").trim();
       if (!title) return null;
       const platform = String(o.mediaPlatform ?? "none");
-      const mediaPlatform = platforms.has(platform)
+      let mediaPlatform = platforms.has(platform)
         ? (platform as Suggestion["mediaPlatform"])
         : "none";
       const steps = Array.isArray(o.steps)
         ? o.steps.map((s) => String(s).trim()).filter(Boolean).slice(0, 6)
         : [];
       const days = Number(o.expectedDaysToResult);
+      let mediaUrl =
+        mediaPlatform === "none" ? "" : String(o.mediaUrl ?? "").trim();
+
+      if (mediaPlatform === "youtube") {
+        const isSearch =
+          mediaUrl.includes("/results") || mediaUrl.includes("search_query=");
+        if (!isSearch) {
+          mediaUrl =
+            `https://www.youtube.com/results?search_query=${encodeURIComponent(title)}`;
+        }
+      }
+
       return {
         id: String(o.id ?? `suggestion-${index + 1}`)
           .toLowerCase()
@@ -100,8 +112,7 @@ function normalize(raw: unknown): Suggestion[] {
             ? Math.round(days)
             : 21,
         mediaPlatform,
-        mediaUrl:
-          mediaPlatform === "none" ? "" : String(o.mediaUrl ?? "").trim(),
+        mediaUrl,
         steps: steps.length ? steps : ["Do this once today", "Repeat daily"],
       };
     })
@@ -132,7 +143,10 @@ Deno.serve(async (req: Request) => {
     const apiKey = Deno.env.get("GEMINI_API_KEY");
     if (!apiKey) {
       return new Response(
-        JSON.stringify({ error: "GEMINI_API_KEY is not configured" }),
+        JSON.stringify({
+          error: "GEMINI_API_KEY is not configured",
+          code: "missing_key",
+        }),
         {
           status: 500,
           headers: { ...corsHeaders, "Content-Type": "application/json" },
@@ -152,34 +166,57 @@ Deno.serve(async (req: Request) => {
       });
     }
 
-    const geminiUrl =
-      "https://generativelanguage.googleapis.com/v1beta/models/gemini-flash-latest:generateContent";
+    const models = ["gemini-2.0-flash", "gemini-flash-latest"];
+    let geminiRes: Response | null = null;
+    let lastStatus = 0;
+    let lastErrText = "";
 
-    const geminiRes = await fetch(geminiUrl, {
-      method: "POST",
-      headers: {
-        "Content-Type": "application/json",
-        "X-goog-api-key": apiKey,
-      },
-      body: JSON.stringify({
-        contents: [{ parts: [{ text: buildPrompt(goal, locale) }] }],
-        generationConfig: {
-          temperature: 0.7,
-          responseMimeType: "application/json",
+    for (const model of models) {
+      const geminiUrl =
+        `https://generativelanguage.googleapis.com/v1beta/models/${model}:generateContent`;
+
+      const res = await fetch(geminiUrl, {
+        method: "POST",
+        headers: {
+          "Content-Type": "application/json",
+          "X-goog-api-key": apiKey,
         },
-      }),
-    });
+        body: JSON.stringify({
+          contents: [{ parts: [{ text: buildPrompt(goal, locale) }] }],
+          generationConfig: {
+            temperature: 0.7,
+            responseMimeType: "application/json",
+          },
+        }),
+      });
 
-    if (!geminiRes.ok) {
-      const errText = await geminiRes.text();
-      console.error("Gemini error", geminiRes.status, errText);
+      if (res.ok) {
+        geminiRes = res;
+        break;
+      }
+
+      lastStatus = res.status;
+      lastErrText = await res.text();
+      console.error("Gemini error", model, lastStatus, lastErrText);
+      if (lastStatus !== 429 && lastStatus !== 404) break;
+    }
+
+    if (!geminiRes) {
+      const code =
+        lastStatus === 429
+          ? "rate_limit"
+          : lastStatus === 401 || lastStatus === 403
+            ? "invalid_key"
+            : "gemini_error";
       return new Response(
         JSON.stringify({
           error: "Gemini request failed",
-          status: geminiRes.status,
+          code,
+          status: lastStatus,
+          detail: lastErrText.slice(0, 400),
         }),
         {
-          status: 502,
+          status: lastStatus === 429 ? 429 : 502,
           headers: { ...corsHeaders, "Content-Type": "application/json" },
         },
       );

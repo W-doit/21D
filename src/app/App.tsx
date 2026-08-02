@@ -10,6 +10,7 @@ import { TodayPage } from '../pages/Today'
 import { WeekPage } from '../pages/Week'
 import { RoutineDetailPage } from '../pages/RoutineDetail'
 import { ProfilePage } from '../pages/Profile'
+import { LibraryPage } from '../pages/Library'
 
 export function App() {
   return (
@@ -22,6 +23,7 @@ export function App() {
             <Route element={<AppLayout />}>
               <Route path="/onboarding" element={<OnboardingPage />} />
               <Route path="/suggest" element={<SuggestPage />} />
+              <Route path="/library" element={<LibraryPage />} />
               <Route path="/today" element={<TodayPage />} />
               <Route path="/week" element={<WeekPage />} />
               <Route path="/routine/:id" element={<RoutineDetailPage />} />
