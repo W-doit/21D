@@ -50,7 +50,7 @@ export function AuthPage() {
             supabaseClient={supabase}
             view="sign_in"
             providers={[]}
-            redirectTo={`${window.location.origin}/auth`}
+            redirectTo={`${window.location.origin}${import.meta.env.BASE_URL}auth`}
             localization={{
               variables: {
                 sign_in: {
