@@ -1,0 +1,82 @@
+@import 'tailwindcss';
+
+@theme {
+  --font-sans: 'Outfit', ui-sans-serif, system-ui, sans-serif;
+  --font-display: 'Instrument Serif', Georgia, serif;
+  --color-ink: #1a2e1f;
+  --color-ink-soft: #3d5244;
+  --color-mist: #f6f4ef;
+  --color-mist-deep: #ebe6db;
+  --color-sage: #6b8f71;
+  --color-sage-deep: #4a6b50;
+  --color-leaf: #c5d9c0;
+  --color-sand: #d4c4a8;
+  --color-coral: #c47a5a;
+}
+
+@layer base {
+  * {
+    -webkit-tap-highlight-color: transparent;
+  }
+
+  html {
+    @apply antialiased;
+  }
+
+  body {
+    @apply m-0 min-h-dvh font-sans text-ink bg-mist;
+    background-image:
+      radial-gradient(ellipse 120% 80% at 100% -20%, #dce8d8 0%, transparent 50%),
+      radial-gradient(ellipse 80% 60% at -10% 100%, #e8dfd0 0%, transparent 45%);
+    background-attachment: fixed;
+  }
+
+  #root {
+    @apply min-h-dvh;
+  }
+
+  button,
+  input,
+  textarea,
+  select {
+    font: inherit;
+  }
+}
+
+@layer components {
+  .page {
+    @apply mx-auto w-full max-w-md px-5 pb-28 pt-6;
+  }
+
+  .page-wide {
+    @apply mx-auto w-full max-w-lg px-5 pb-10 pt-8;
+  }
+
+  .btn-primary {
+    @apply inline-flex items-center justify-center gap-2 rounded-2xl px-5 py-3.5 text-[15px] font-medium transition active:scale-[0.98] disabled:opacity-50 bg-ink text-mist shadow-sm hover:bg-ink-soft;
+  }
+
+  .btn-secondary {
+    @apply inline-flex items-center justify-center gap-2 rounded-2xl px-5 py-3.5 text-[15px] font-medium transition active:scale-[0.98] disabled:opacity-50 bg-white/70 text-ink ring-1 ring-ink/10 hover:bg-white;
+  }
+
+  .btn-ghost {
+    @apply inline-flex items-center justify-center gap-2 rounded-2xl px-5 py-3.5 text-[15px] font-medium transition active:scale-[0.98] disabled:opacity-50 bg-transparent text-ink-soft hover:bg-ink/5;
+  }
+
+  .field {
+    @apply w-full rounded-2xl border-0 bg-white/80 px-4 py-3.5 text-ink shadow-sm ring-1 ring-ink/8 placeholder:text-ink/35 outline-none focus:ring-2 focus:ring-sage/40;
+  }
+
+  .label {
+    @apply mb-1.5 block text-sm font-medium text-ink-soft;
+  }
+
+  .surface {
+    @apply rounded-3xl bg-white/65 p-5 shadow-sm ring-1 ring-ink/6 backdrop-blur-sm;
+  }
+
+  .display {
+    font-family: var(--font-display);
+  }
+}
